@@ -70,3 +70,37 @@ func WithoutPrefix(prefix string) FilterFunc {
 		return !strings.HasPrefix(path, prefix)
 	}
 }
+
+// DotFile reports whether a path begins with a dot.
+var DotFile FilterFunc = WithPrefix(".")
+
+// And chains FilterFuncs and returns whether they are all true.
+func And(filters ...FilterFunc) FilterFunc {
+	return func(path string, d fs.DirEntry) bool {
+		for _, f := range filters {
+			if !f(path, d) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// Or chains FilterFuncs and returns whether at least one is true.
+func Or(filters ...FilterFunc) FilterFunc {
+	return func(path string, d fs.DirEntry) bool {
+		for _, f := range filters {
+			if f(path, d) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// Not inverts a FilterFunc.
+func Not(f FilterFunc) FilterFunc {
+	return func(path string, d fs.DirEntry) bool {
+		return !f(path, d)
+	}
+}
