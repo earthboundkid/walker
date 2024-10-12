@@ -18,6 +18,11 @@ func MatchRegexp(re *regexp.Regexp) FilterFunc {
 	}
 }
 
+// MatchRegexpMust compiles re using regexp.MustCompile and passes it to MatchRegexp.
+func MatchRegexpMust(re string) FilterFunc {
+	return MatchRegexp(regexp.MustCompile(re))
+}
+
 // MatchGlob returns true if the path matches any of the glob patterns.
 func MatchGlob(patterns ...string) FilterFunc {
 	return func(path string, d fs.DirEntry) bool {
