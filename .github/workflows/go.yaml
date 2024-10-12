@@ -1,0 +1,16 @@
+name: Go
+on: [push]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - name: Download modules
+        run: go mod download
+
+      - name: Test
+        run: go test -v ./...
