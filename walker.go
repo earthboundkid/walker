@@ -49,9 +49,17 @@ func New(fsys fs.FS, root string) Walker {
 func (w *Walker) Walk() func(func() bool) {
 	return func(yield func() bool) {
 		for range w.walk {
+			if w.HasError() {
+				if !yield() {
+					return
+				}
+				continue
+			}
 			if dir := w.Dir(); w.excludeDirs(dir, w.DirEntry()) ||
 				!w.includeDirs(dir, w.DirEntry()) {
-				w.SkipDir()
+				if w.IsDir() {
+					w.SkipDir()
+				}
 				continue
 			}
 
