@@ -11,16 +11,14 @@ import (
 // FilterFunc is a function type used to filter files and directories during the walk.
 type FilterFunc func(path string, d fs.DirEntry) bool
 
-// MatchRegexp creates a FilterFunc that uses a precompiled regular expression to filter paths.
-// It returns true if the path matches the regular expression.
+// MatchRegexp returns true if the path matches the regular expression.
 func MatchRegexp(re *regexp.Regexp) FilterFunc {
 	return func(path string, d fs.DirEntry) bool {
 		return re.MatchString(path)
 	}
 }
 
-// MatchGlob creates a FilterFunc that uses one or more glob patterns to filter paths.
-// It returns true if the path matches any of the glob patterns.
+// MatchGlob returns true if the path matches any of the glob patterns.
 func MatchGlob(patterns ...string) FilterFunc {
 	return func(path string, d fs.DirEntry) bool {
 		for _, pattern := range patterns {
