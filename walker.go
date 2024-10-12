@@ -33,6 +33,7 @@ func excludeNone(path string, d fs.DirEntry) bool {
 
 // New creates a new *Walker instance with the given root directory.
 // Pass a nil fs.FS to use filepath.WalkFunc and walk the OS filesystem.
+// The default Walker includes all files and directories.
 func New(fsys fs.FS, root string) Walker {
 	return Walker{
 		fsys:         fsys,
