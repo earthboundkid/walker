@@ -68,7 +68,10 @@ func WithoutPrefix(prefix string) FilterFunc {
 }
 
 // DotFile reports whether a path begins with a dot.
-var DotFile FilterFunc = WithPrefix(".")
+// As a special case, it allows for a lone "." as the current directory.
+func DotFile(path string, d fs.DirEntry) bool {
+	return path != "." && strings.HasPrefix(path, ".")
+}
 
 // And chains FilterFuncs and returns whether they are all true.
 func And(filters ...FilterFunc) FilterFunc {
