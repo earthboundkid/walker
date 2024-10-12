@@ -4,6 +4,7 @@ package walker
 import (
 	"io/fs"
 	"iter"
+	"path"
 	"path/filepath"
 )
 
@@ -45,7 +46,23 @@ func New(fsys fs.FS, root string) Walker {
 
 // Walk returns a function that walks the filepath.
 func (w *Walker) Walk() func(func() bool) {
-	return w.walk
+	return func(yield func() bool) {
+		for range w.walk {
+			if dir := w.Dir(); w.excludeDirs(dir, w.DirEntry()) ||
+				!w.includeDirs(dir, w.DirEntry()) {
+				w.SkipDir()
+				continue
+			}
+
+			if w.excludeFiles(w.Path(), w.DirEntry()) ||
+				!w.includeFiles(w.Path(), w.DirEntry()) {
+				continue
+			}
+			if !yield() {
+				return
+			}
+		}
+	}
 }
 
 func (w *Walker) walk(yield func() bool) {
@@ -55,14 +72,6 @@ func (w *Walker) walk(yield func() bool) {
 	w.walking = true
 	walkDir := func(path string, d fs.DirEntry, err error) error {
 		w.path, w.d, w.err = path, d, err
-		if d.IsDir() {
-			if path != "." && (w.excludeDirs(path, d) || !w.includeDirs(path, d)) {
-				return filepath.SkipDir
-			}
-		}
-		if w.excludeFiles(path, d) || !w.includeFiles(path, d) {
-			return nil
-		}
 		if !yield() {
 			return filepath.SkipAll
 		}
@@ -90,6 +99,17 @@ func (w *Walker) Path() string {
 	return w.path
 }
 
+// Dir returns the directory of the current path being walked.
+func (w *Walker) Dir() string {
+	if w.IsDir() {
+		return w.Path()
+	}
+	if w.fsys != nil {
+		return path.Dir(w.Path())
+	}
+	return filepath.Dir(w.Path())
+}
+
 // DirEntry returns the fs.DirEntry for the current file or directory.
 func (w *Walker) DirEntry() fs.DirEntry {
 	return w.d
@@ -102,7 +122,9 @@ func (w *Walker) IsDir() bool {
 
 // SkipDir signals that the current directory should be skipped.
 func (w *Walker) SkipDir() {
-	w.skipDir = true
+	if w.path != w.root {
+		w.skipDir = true
+	}
 }
 
 // HasError returns true if an error has been encountered during the walk.

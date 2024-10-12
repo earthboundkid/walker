@@ -1,7 +1,6 @@
 package walker_test
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -47,7 +46,7 @@ func TestWalker(t *testing.T) {
 		{
 			name: "Only files in dir1",
 			setup: func(w *walker.Walker) {
-				w.Include(walker.MatchGlob("dir1/*"))
+				w.IncludeDirs(walker.MatchGlob("dir1"))
 			},
 			want: "dir1/file3.txt; dir1/file4.log",
 		},
@@ -61,9 +60,16 @@ func TestWalker(t *testing.T) {
 		{
 			name: "Only .txt and .go files",
 			setup: func(w *walker.Walker) {
-				w.Include(walker.MatchRegexp(regexp.MustCompile(`\.(txt|go)$`)))
+				w.Include(walker.MatchRegexpMust(`\.(txt|go)$`))
 			},
 			want: "dir1/file3.txt; dir2/file5.txt; dir2/subdir/file6.go; file1.txt",
+		},
+		{
+			name: "Not .go files",
+			setup: func(w *walker.Walker) {
+				w.Include(walker.Not(walker.MatchExtension(".go")))
+			},
+			want: "dir1/file3.txt; dir1/file4.log; dir2/file5.txt; file1.txt; file2.log",
 		},
 	}
 
