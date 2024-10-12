@@ -38,15 +38,11 @@ func MatchGlob(patterns ...string) FilterFunc {
 
 // MatchExtension creates a FilterFunc that filters files based on their extensions.
 // It returns true if the file has any of the specified extensions.
-// It returns false for directories.
 func MatchExtension(extensions ...string) FilterFunc {
 	for i := range extensions {
 		extensions[i] = strings.ToLower(extensions[i])
 	}
 	return func(path string, d fs.DirEntry) bool {
-		if d.IsDir() {
-			return false
-		}
 		ext := strings.ToLower(filepath.Ext(path))
 		for _, e := range extensions {
 			if e == ext {
