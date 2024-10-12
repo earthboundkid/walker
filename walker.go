@@ -230,22 +230,24 @@ func (w *Walker) EntriesIgnoringErrors() iter.Seq[fs.DirEntry] {
 	}
 }
 
-// Include sets the filter function for including files.
+// Include tells the Walker to include matching files when iterating.
 func (w *Walker) Include(f FilterFunc) {
 	w.includeFiles = f
 }
 
-// Exclude sets the filter function for excluding files.
+// Exclude tells the Walker to exclude matching files when iterating.
+// Files matched by Exclude take precedence over files matched by Include.
 func (w *Walker) Exclude(f FilterFunc) {
 	w.excludeFiles = f
 }
 
-// IncludeDirs sets the filter function for including directories.
-func (w *Walker) IncludeDirs(f FilterFunc) {
+// IncludeDir tells the Walker to recursing into matching directories.
+func (w *Walker) IncludeDir(f FilterFunc) {
 	w.includeDirs = f
 }
 
-// ExcludeDirs sets the filter function for excluding directories.
-func (w *Walker) ExcludeDirs(f FilterFunc) {
+// ExcludeDir tells the Walker not to recursing into matching directories.
+// Directories matched by ExcludeDir take precedence over directories matched by IncludeDir.
+func (w *Walker) ExcludeDir(f FilterFunc) {
 	w.excludeDirs = f
 }
