@@ -19,6 +19,7 @@ type Walker struct {
 	skipDir                    bool
 	includeFiles, excludeFiles FilterFunc
 	includeDirs, excludeDirs   FilterFunc
+	erp                        ErrorPolicy
 }
 
 // includeAll is a default FilterFunc that includes all files and directories.
@@ -34,7 +35,8 @@ func excludeNone(path string, d fs.DirEntry) bool {
 // New creates a new *Walker instance with the given root directory.
 // Pass a nil fs.FS to use filepath.WalkFunc and walk the OS filesystem.
 // The default Walker includes all files and directories.
-func New(fsys fs.FS, root string) Walker {
+// There is no default ErrorPolicy.
+func New(fsys fs.FS, root string, erp ErrorPolicy) Walker {
 	return Walker{
 		fsys:         fsys,
 		root:         root,
@@ -42,15 +44,17 @@ func New(fsys fs.FS, root string) Walker {
 		excludeFiles: excludeNone,
 		includeDirs:  includeAll,
 		excludeDirs:  excludeNone,
+		erp:          erp,
 	}
 }
 
-// Walk returns a function that walks the filepath.
-func (w *Walker) Walk() func(func() bool) {
-	return func(yield func() bool) {
+// Walk returns an iterator that walks the filepath
+// while following the ErrorPolicy.
+func (w *Walker) Walk() iter.Seq2[string, fs.DirEntry] {
+	return func(yield func(string, fs.DirEntry) bool) {
 		for range w.walk {
 			if w.HasError() {
-				if !yield() {
+				if !w.erp(w) {
 					return
 				}
 				continue
@@ -67,7 +71,7 @@ func (w *Walker) Walk() func(func() bool) {
 				!w.includeFiles(w.Path(), w.DirEntry()) {
 				continue
 			}
-			if !yield() {
+			if !yield(w.Path(), w.DirEntry()) {
 				return
 			}
 		}
@@ -77,6 +81,9 @@ func (w *Walker) Walk() func(func() bool) {
 func (w *Walker) walk(yield func() bool) {
 	if w.walking {
 		panic("already walking")
+	}
+	if w.erp == nil {
+		panic("no error policy set")
 	}
 	w.walking = true
 	walkDir := func(path string, d fs.DirEntry, err error) error {
@@ -126,6 +133,9 @@ func (w *Walker) DirEntry() fs.DirEntry {
 
 // IsDir returns whether the current path is a directory.
 func (w *Walker) IsDir() bool {
+	if w.d == nil {
+		return false
+	}
 	return w.d.IsDir()
 }
 
@@ -141,101 +151,9 @@ func (w *Walker) HasError() bool {
 	return w.err != nil
 }
 
-// WalkUntilError returns an iterator that walks until an error is encountered.
-func (w *Walker) WalkUntilError() iter.Seq2[string, fs.DirEntry] {
-	return func(yield func(string, fs.DirEntry) bool) {
-		for range w.Walk() {
-			if w.HasError() || !yield(w.Path(), w.DirEntry()) {
-				return
-			}
-		}
-	}
-}
-
-// WalkIgnoringErrors returns an iterator that walks ignoring any errors encountered.
-func (w *Walker) WalkIgnoringErrors() iter.Seq2[string, fs.DirEntry] {
-	return func(yield func(string, fs.DirEntry) bool) {
-		for range w.Walk() {
-			if w.HasError() {
-				continue
-			}
-			if !yield(w.Path(), w.DirEntry()) {
-				return
-			}
-		}
-	}
-}
-
-// PathsUntilError returns an iterator of file paths, stopping if an error is encountered.
-func (w *Walker) PathsUntilError() iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for path := range w.WalkUntilError() {
-			if !yield(path) {
-				return
-			}
-		}
-	}
-}
-
-// PathsIgnoringErrors returns an iterator of paths, ignoring any errors encountered.
-func (w *Walker) PathsIgnoringErrors() iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for path := range w.WalkIgnoringErrors() {
-			if !yield(path) {
-				return
-			}
-		}
-	}
-}
-
-// FilePathsUntilError returns an iterator of file paths, ignoring directories and stopping if an error is encountered.
-func (w *Walker) FilePathsUntilError() iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for path := range w.PathsUntilError() {
-			if w.IsDir() {
-				continue
-			}
-			if !yield(path) {
-				return
-			}
-		}
-	}
-}
-
-// FilePathsIgnoringErrors returns an iterator of paths, ignoring directories and any errors encountered.
-func (w *Walker) FilePathsIgnoringErrors() iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for path := range w.PathsIgnoringErrors() {
-			if w.IsDir() {
-				continue
-			}
-			if !yield(path) {
-				return
-			}
-		}
-	}
-}
-
-// EntriesUntilError returns an iterator of fs.DirEntry, stopping if an error is encountered.
-func (w *Walker) EntriesUntilError() iter.Seq[fs.DirEntry] {
-	return func(yield func(fs.DirEntry) bool) {
-		for _, entry := range w.WalkUntilError() {
-			if !yield(entry) {
-				return
-			}
-		}
-	}
-}
-
-// EntriesIgnoringErrors returns an iterator of fs.DirEntry, ignoring any errors encountered.
-func (w *Walker) EntriesIgnoringErrors() iter.Seq[fs.DirEntry] {
-	return func(yield func(fs.DirEntry) bool) {
-		for _, entry := range w.WalkIgnoringErrors() {
-			if !yield(entry) {
-				return
-			}
-		}
-	}
+// ErrorPolicy sets the ErrorPolicy associated with the Walker.
+func (w *Walker) ErrorPolicy(erp ErrorPolicy) {
+	w.erp = erp
 }
 
 // Include tells the Walker to include matching files when iterating.
@@ -258,4 +176,51 @@ func (w *Walker) IncludeDir(f FilterFunc) {
 // Directories matched by ExcludeDir take precedence over directories matched by IncludeDir.
 func (w *Walker) ExcludeDir(f FilterFunc) {
 	w.excludeDirs = f
+}
+
+// Paths returns an iterator of file paths.
+func (w *Walker) Paths(erp ErrorPolicy) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for path := range w.Walk() {
+			if !yield(path) {
+				return
+			}
+		}
+	}
+}
+
+// Files returns a sequence of paths and directory entries
+// for files in root, ignoring directories.
+func (w *Walker) Files() iter.Seq2[string, fs.DirEntry] {
+	return func(yield func(string, fs.DirEntry) bool) {
+		for path, de := range w.Walk() {
+			if !w.IsDir() && !yield(path, de) {
+				return
+			}
+		}
+	}
+}
+
+// FilePaths returns a sequence of file paths,
+// ignoring directories.
+func (w *Walker) FilePaths() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for path := range w.Files() {
+			if !yield(path) {
+				return
+			}
+		}
+	}
+}
+
+// Entries returns an iterator of fs.DirEntry
+// while following the ErrorPolicy.
+func (w *Walker) Entries() iter.Seq[fs.DirEntry] {
+	return func(yield func(fs.DirEntry) bool) {
+		for _, entry := range w.Walk() {
+			if !yield(entry) {
+				return
+			}
+		}
+	}
 }
