@@ -23,6 +23,15 @@ func (e Entry) IsDir() bool {
 	return e.DirEntry.IsDir()
 }
 
+// Name returns DirEntry.Name() is a directory.
+// If DirEntry is nil, it returns "".
+func (e Entry) Name() string {
+	if e.DirEntry == nil {
+		return ""
+	}
+	return e.DirEntry.Name()
+}
+
 // Dir returns the directory of the Entry.
 // Unlike [path.Dir] or [filepath.Dir],
 // it knows whether e represents a directory,

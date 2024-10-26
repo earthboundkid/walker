@@ -88,8 +88,8 @@ func TestRanger(t *testing.T) {
 		{
 			name: "No dot files",
 			setup: func(w *walker.Ranger) {
-				w.Exclude(walker.DotFile)
-				w.ExcludeDir(walker.DotFile)
+				w.Exclude(walker.MatchDotFile)
+				w.ExcludeDir(walker.MatchDotFile)
 			},
 			want: "a.txt; dir1/file3.txt; dir1/file4.log; dir2/file5.txt; dir2/subdir/file6.go; file1.txt; file2.log",
 		},
@@ -97,10 +97,10 @@ func TestRanger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := walker.New(testFS, ".", walker.OnErrorHalt)
-			tt.setup(&w)
+			tr := walker.New(testFS, ".", walker.OnErrorHalt)
+			tt.setup(&tr)
 
-			paths := slices.Collect(w.FilePaths())
+			paths := slices.Collect(tr.FilePaths())
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
 		})
 	}
@@ -108,25 +108,25 @@ func TestRanger(t *testing.T) {
 
 func ExampleRanger() {
 	{
-		w := walker.New(nil, "testdata", walker.OnErrorHalt)
-		w.Exclude(walker.DotFile)
-		w.ExcludeDir(walker.DotFile)
-		paths := slices.Collect(w.FilePaths())
-		if w.HasError() {
-			panic(w.Err())
+		tr := walker.New(nil, "testdata", walker.OnErrorHalt)
+		tr.Exclude(walker.MatchDotFile)
+		tr.ExcludeDir(walker.MatchDotFile)
+		paths := slices.Collect(tr.FilePaths())
+		if tr.HasError() {
+			panic(tr.Err())
 		}
 		fmt.Println("All files:")
 		fmt.Println(strings.Join(paths, "; "))
 	}
 	{
-		w := walker.New(nil, "testdata", walker.OnErrorHalt)
-		w.Exclude(walker.DotFile)
-		w.ExcludeDir(walker.DotFile)
-		w.Include(walker.MatchExtension(".txt"))
-		w.IncludeDir(walker.MatchRegexpMust("2"))
-		paths := slices.Collect(w.FilePaths())
-		if w.HasError() {
-			panic(w.Err())
+		tr := walker.New(nil, "testdata", walker.OnErrorHalt)
+		tr.Exclude(walker.MatchDotFile)
+		tr.ExcludeDir(walker.MatchDotFile)
+		tr.Include(walker.MatchExtension(".txt"))
+		tr.IncludeDir(walker.MatchRegexpMust(`2`))
+		paths := slices.Collect(tr.FilePaths())
+		if tr.HasError() {
+			panic(tr.Err())
 		}
 		fmt.Println("Files ending with .txt in a directory with 2:")
 		fmt.Println(strings.Join(paths, "; "))

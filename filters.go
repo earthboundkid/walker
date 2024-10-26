@@ -22,8 +22,8 @@ func MatchRegexpMust(re string) FilterFunc {
 	return MatchRegexp(regexp.MustCompile(re))
 }
 
-// MatchGlob returns true if the path matches any of the glob patterns.
-func MatchGlob(patterns ...string) FilterFunc {
+// MatchGlobPath returns true if the path matches any of the glob patterns.
+func MatchGlobPath(patterns ...string) FilterFunc {
 	return func(e Entry) bool {
 		for _, pattern := range patterns {
 			matched, err := filepath.Match(pattern, e.Path)
@@ -35,8 +35,22 @@ func MatchGlob(patterns ...string) FilterFunc {
 	}
 }
 
+// MatchGlobName returns true if Entry.Name() matches any of the glob patterns.
+func MatchGlobName(patterns ...string) FilterFunc {
+	return func(e Entry) bool {
+		for _, pattern := range patterns {
+			matched, err := filepath.Match(pattern, e.Name())
+			if err == nil && matched {
+				return true
+			}
+		}
+		return false
+	}
+}
+
 // MatchExtension creates a FilterFunc that filters files based on their extensions.
 // It returns true if the file has any of the specified extensions.
+// It is case insensitive.
 func MatchExtension(extensions ...string) FilterFunc {
 	for i := range extensions {
 		extensions[i] = strings.ToLower(extensions[i])
@@ -52,25 +66,23 @@ func MatchExtension(extensions ...string) FilterFunc {
 	}
 }
 
-// WithPrefix creates a FilterFunc that matches paths starting with the given prefix.
-func WithPrefix(prefix string) FilterFunc {
+// MatchPrefixPath creates a FilterFunc that matches paths starting with the given prefix.
+func MatchPrefixPath(prefix string) FilterFunc {
 	return func(e Entry) bool {
 		return strings.HasPrefix(e.Path, prefix)
 	}
 }
 
-// WithoutPrefix creates a FilterFunc that matches paths not starting with the given prefix.
-func WithoutPrefix(prefix string) FilterFunc {
+// MatchPrefixName creates a FilterFunc
+// that matches if Entry.Name() starts with the given prefix.
+func MatchPrefixName(prefix string) FilterFunc {
 	return func(e Entry) bool {
-		return !strings.HasPrefix(e.Path, prefix)
+		return strings.HasPrefix(e.Path, prefix)
 	}
 }
 
-// DotFile reports whether a base name begins with a dot.
-// As a special case, it allows for a lone "." as the current directory.
-func DotFile(e Entry) bool {
-	return e.Base() != "." && strings.HasPrefix(e.Base(), ".")
-}
+// MatchDotFile reports whether an Entry.Name() begins with a dot.
+var MatchDotFile FilterFunc = MatchPrefixName(".")
 
 // And chains FilterFuncs and returns whether they are all true.
 func And(filters ...FilterFunc) FilterFunc {
