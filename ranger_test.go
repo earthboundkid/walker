@@ -15,7 +15,7 @@ import (
 	"github.com/earthboundkid/walker"
 )
 
-func TestWalker(t *testing.T) {
+func TestRanger(t *testing.T) {
 	testFS := fstest.MapFS{
 		"a.txt":                &fstest.MapFile{},
 		"dir1/file3.txt":       &fstest.MapFile{},
@@ -28,66 +28,66 @@ func TestWalker(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		setup func(*walker.Walker)
+		setup func(*walker.Ranger)
 		want  string
 	}{
 		{
 			name:  "Walk all files",
-			setup: func(w *walker.Walker) {},
+			setup: func(w *walker.Ranger) {},
 			want:  "a.txt; dir1/file3.txt; dir1/file4.log; dir2/file5.txt; dir2/subdir/file6.go; file1.txt; file2.log",
 		},
 		{
 			name: "Only .txt files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Include(walker.MatchExtension(".txt"))
 			},
 			want: "a.txt; dir1/file3.txt; dir2/file5.txt; file1.txt",
 		},
 		{
 			name: "Exclude .log files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Exclude(walker.MatchExtension(".log"))
 			},
 			want: "a.txt; dir1/file3.txt; dir2/file5.txt; dir2/subdir/file6.go; file1.txt",
 		},
 		{
 			name: "Only files in dir1",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.IncludeDir(walker.MatchRegexpMust("dir1"))
 			},
 			want: "dir1/file3.txt; dir1/file4.log",
 		},
 		{
 			name: "Exclude dir2",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.ExcludeDir(walker.MatchRegexpMust("dir2"))
 			},
 			want: "a.txt; dir1/file3.txt; dir1/file4.log; file1.txt; file2.log",
 		},
 		{
 			name: "Only .txt and .go files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Include(walker.MatchRegexpMust(`\.(txt|go)$`))
 			},
 			want: "a.txt; dir1/file3.txt; dir2/file5.txt; dir2/subdir/file6.go; file1.txt",
 		},
 		{
 			name: "Not .go files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Exclude(walker.MatchExtension(".go"))
 			},
 			want: "a.txt; dir1/file3.txt; dir1/file4.log; dir2/file5.txt; file1.txt; file2.log",
 		},
 		{
 			name: "Also not .go files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Include(walker.Not(walker.MatchExtension(".go")))
 			},
 			want: "a.txt; dir1/file3.txt; dir1/file4.log; dir2/file5.txt; file1.txt; file2.log",
 		},
 		{
 			name: "No dot files",
-			setup: func(w *walker.Walker) {
+			setup: func(w *walker.Ranger) {
 				w.Exclude(walker.DotFile)
 				w.ExcludeDir(walker.DotFile)
 			},
@@ -97,20 +97,18 @@ func TestWalker(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := walker.New(testFS, ".", walker.HaltOnError)
+			w := walker.New(testFS, ".", walker.OnErrorHalt)
 			tt.setup(&w)
 
 			paths := slices.Collect(w.FilePaths())
-			if got := strings.Join(paths, "; "); got != tt.want {
-				t.Errorf("Walker.FilePaths: want %q, got %q", tt.want, got)
-			}
+			be.Equal(t, tt.want, strings.Join(paths, "; "))
 		})
 	}
 }
 
-func ExampleWalker() {
+func ExampleRanger() {
 	{
-		w := walker.New(nil, "testdata", walker.HaltOnError)
+		w := walker.New(nil, "testdata", walker.OnErrorHalt)
 		w.Exclude(walker.DotFile)
 		w.ExcludeDir(walker.DotFile)
 		paths := slices.Collect(w.FilePaths())
@@ -121,7 +119,7 @@ func ExampleWalker() {
 		fmt.Println(strings.Join(paths, "; "))
 	}
 	{
-		w := walker.New(nil, "testdata", walker.HaltOnError)
+		w := walker.New(nil, "testdata", walker.OnErrorHalt)
 		w.Exclude(walker.DotFile)
 		w.ExcludeDir(walker.DotFile)
 		w.Include(walker.MatchExtension(".txt"))
@@ -154,14 +152,12 @@ func TestCollectErrors(t *testing.T) {
 	})
 
 	var errs []error
-	w := walker.New(nil, dir, walker.CollectErrors(&errs))
-	paths := slices.Collect(w.FilePaths())
+	w := walker.New(nil, dir, walker.OnErrorCollect(&errs))
+	var paths []string
+	for path := range w.FilePaths() {
+		paths = append(paths, filepath.Base(path))
+	}
 	be.Equal(t, "2.txt", strings.Join(paths, "; "))
-
-	if len(errs) != 1 {
-		t.Fatalf("want 1 error; got %v", errs)
-	}
-	if !errors.Is(errs[0], fs.ErrPermission) {
-		t.Errorf("want permission error, got: %v", errs[0])
-	}
+	be.Equal(t, 1, len(errs))
+	be.True(t, errors.Is(errs[0], fs.ErrPermission))
 }

@@ -7,28 +7,28 @@ import (
 
 // ErrorPolicy is a function that returns
 // whether to continue (true) or halt (false) on error
-// by examining the current state of the Walker.
-type ErrorPolicy func(w *Walker) bool
+// by examining the error and the current Entry.
+type ErrorPolicy func(err error, e Entry) bool
 
-// IgnoreErrors is an ErrorPolicy that always continues regardless of errors.
-var IgnoreErrors ErrorPolicy = func(*Walker) bool { return true }
+// OnErrorIgnore is an ErrorPolicy that always continues regardless of errors.
+var OnErrorIgnore ErrorPolicy = func(error, Entry) bool { return true }
 
-// HaltOnError is an ErrorPolicy that halts on any error.
-var HaltOnError ErrorPolicy = func(*Walker) bool { return false }
+// OnErrorHalt is an ErrorPolicy that halts on any error.
+var OnErrorHalt ErrorPolicy = func(error, Entry) bool { return false }
 
-// CollectErrors returns an ErrorPolicy that
+// OnErrorCollect returns an ErrorPolicy that
 // collects errors into the provided slice
 // while continuing.
-func CollectErrors(errs *[]error) ErrorPolicy {
-	return func(w *Walker) bool {
-		*errs = append(*errs, w.Err())
+func OnErrorCollect(errs *[]error) ErrorPolicy {
+	return func(err error, e Entry) bool {
+		*errs = append(*errs, err)
 		return true
 	}
 }
 
-// IgnoreErrPermission is an ErrorPolicy
+// OnErrPermissionIgnore is an ErrorPolicy
 // that continues if an error is fs.ErrPermission;
 // otherwise it halts on error.
-var IgnoreErrPermission ErrorPolicy = func(w *Walker) bool {
-	return errors.Is(w.Err(), fs.ErrPermission)
+var OnErrPermissionIgnore ErrorPolicy = func(err error, e Entry) bool {
+	return errors.Is(err, fs.ErrPermission)
 }

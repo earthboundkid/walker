@@ -2,19 +2,18 @@
 package walker
 
 import (
-	"io/fs"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 // FilterFunc is a function type used to filter files and directories during the walk.
-type FilterFunc func(path string, d fs.DirEntry) bool
+type FilterFunc func(Entry) bool
 
 // MatchRegexp returns true if the path matches the regular expression.
 func MatchRegexp(re *regexp.Regexp) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
-		return re.MatchString(path)
+	return func(e Entry) bool {
+		return re.MatchString(e.Path)
 	}
 }
 
@@ -25,9 +24,9 @@ func MatchRegexpMust(re string) FilterFunc {
 
 // MatchGlob returns true if the path matches any of the glob patterns.
 func MatchGlob(patterns ...string) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
+	return func(e Entry) bool {
 		for _, pattern := range patterns {
-			matched, err := filepath.Match(pattern, path)
+			matched, err := filepath.Match(pattern, e.Path)
 			if err == nil && matched {
 				return true
 			}
@@ -42,8 +41,8 @@ func MatchExtension(extensions ...string) FilterFunc {
 	for i := range extensions {
 		extensions[i] = strings.ToLower(extensions[i])
 	}
-	return func(path string, d fs.DirEntry) bool {
-		ext := strings.ToLower(filepath.Ext(path))
+	return func(e Entry) bool {
+		ext := strings.ToLower(filepath.Ext(e.Path))
 		for _, e := range extensions {
 			if e == ext {
 				return true
@@ -55,29 +54,29 @@ func MatchExtension(extensions ...string) FilterFunc {
 
 // WithPrefix creates a FilterFunc that matches paths starting with the given prefix.
 func WithPrefix(prefix string) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
-		return strings.HasPrefix(path, prefix)
+	return func(e Entry) bool {
+		return strings.HasPrefix(e.Path, prefix)
 	}
 }
 
 // WithoutPrefix creates a FilterFunc that matches paths not starting with the given prefix.
 func WithoutPrefix(prefix string) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
-		return !strings.HasPrefix(path, prefix)
+	return func(e Entry) bool {
+		return !strings.HasPrefix(e.Path, prefix)
 	}
 }
 
-// DotFile reports whether a path begins with a dot.
+// DotFile reports whether a base name begins with a dot.
 // As a special case, it allows for a lone "." as the current directory.
-func DotFile(path string, d fs.DirEntry) bool {
-	return path != "." && strings.HasPrefix(path, ".")
+func DotFile(e Entry) bool {
+	return e.Base() != "." && strings.HasPrefix(e.Base(), ".")
 }
 
 // And chains FilterFuncs and returns whether they are all true.
 func And(filters ...FilterFunc) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
+	return func(e Entry) bool {
 		for _, f := range filters {
-			if !f(path, d) {
+			if !f(e) {
 				return false
 			}
 		}
@@ -87,9 +86,9 @@ func And(filters ...FilterFunc) FilterFunc {
 
 // Or chains FilterFuncs and returns whether at least one is true.
 func Or(filters ...FilterFunc) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
+	return func(e Entry) bool {
 		for _, f := range filters {
-			if f(path, d) {
+			if f(e) {
 				return true
 			}
 		}
@@ -99,7 +98,7 @@ func Or(filters ...FilterFunc) FilterFunc {
 
 // Not inverts a FilterFunc.
 func Not(f FilterFunc) FilterFunc {
-	return func(path string, d fs.DirEntry) bool {
-		return !f(path, d)
+	return func(e Entry) bool {
+		return !f(e)
 	}
 }
