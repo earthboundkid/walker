@@ -42,7 +42,7 @@ func MatchExtension(extensions ...string) FilterFunc {
 		extensions[i] = strings.ToLower(extensions[i])
 	}
 	return func(e Entry) bool {
-		ext := strings.ToLower(filepath.Ext(e.Path))
+		ext := strings.ToLower(e.Ext())
 		for _, e := range extensions {
 			if e == ext {
 				return true
