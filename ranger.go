@@ -20,14 +20,10 @@ type Ranger struct {
 }
 
 // includeAll is a default FilterFunc that includes all files and directories.
-func includeAll(Entry) bool {
-	return true
-}
+func includeAll(Entry) bool { return true }
 
 // excludeNone is a default FilterFunc that includes all files and directories.
-func excludeNone(Entry) bool {
-	return false
-}
+func excludeNone(Entry) bool { return false }
 
 // New creates a new *Walker instance with the given root directory.
 // Pass a nil fs.FS to use filepath.WalkFunc and walk the OS filesystem.
@@ -47,23 +43,23 @@ func New(fsys fs.FS, root string, erp ErrorPolicy) Ranger {
 
 // Walk returns an iterator that walks the filepath
 // while filtering files and directories and following the ErrorPolicy.
-func (w *Ranger) Walk() iter.Seq[Entry] {
+func (tr *Ranger) Walk() iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
-		for e := range w.walk {
-			if w.HasError() {
-				if !w.erp(w.Err(), e) {
+		for e := range tr.walk {
+			if tr.HasError() {
+				if !tr.erp(tr.Err(), e) {
 					return
 				}
 				continue
 			}
-			if w.excludeDirs(e) || !w.includeDirs(e) {
+			if tr.excludeDirs(e) || !tr.includeDirs(e) {
 				if e.IsDir() {
-					w.SkipDir()
+					tr.SkipDir()
 				}
 				continue
 			}
 
-			if w.excludeFiles(e) || !w.includeFiles(e) {
+			if tr.excludeFiles(e) || !tr.includeFiles(e) {
 				continue
 			}
 			if !yield(e) {
@@ -74,83 +70,83 @@ func (w *Ranger) Walk() iter.Seq[Entry] {
 }
 
 // walk is lower level and doesn't know about the error policy or filters
-func (w *Ranger) walk(yield func(Entry) bool) {
-	if w.walking {
+func (tr *Ranger) walk(yield func(Entry) bool) {
+	if tr.walking {
 		panic("already walking")
 	}
-	if w.erp == nil {
+	if tr.erp == nil {
 		panic("no error policy set")
 	}
 	var e Entry
-	e.useFilepath = w.fsys == nil
-	w.walking = true
+	e.useFilepath = tr.fsys == nil
+	tr.walking = true
 	walkDir := func(path string, d fs.DirEntry, err error) error {
-		e.Path, e.DirEntry, w.lastErr = path, d, err
+		e.Path, e.DirEntry, tr.lastErr = path, d, err
 		if !yield(e) {
 			return fs.SkipAll
 		}
-		if w.skipDir {
-			w.skipDir = false
-			if e.Path != w.root {
+		if tr.skipDir {
+			tr.skipDir = false
+			if e.Path != tr.root {
 				return fs.SkipDir
 			}
 		}
 		return nil
 	}
-	if w.fsys != nil {
-		_ = fs.WalkDir(w.fsys, w.root, walkDir)
+	if tr.fsys != nil {
+		_ = fs.WalkDir(tr.fsys, tr.root, walkDir)
 	} else {
-		_ = filepath.WalkDir(w.root, walkDir)
+		_ = filepath.WalkDir(tr.root, walkDir)
 	}
-	w.walking = false
+	tr.walking = false
 }
 
 // Err returns the last error encountered during walking, if any.
-func (r *Ranger) Err() error {
-	return r.lastErr
+func (tr *Ranger) Err() error {
+	return tr.lastErr
 }
 
 // HasError returns true if an error has been encountered during the last walk.
-func (r *Ranger) HasError() bool {
-	return r.Err() != nil
+func (tr *Ranger) HasError() bool {
+	return tr.Err() != nil
 }
 
 // SkipDir signals to a Ranger that the current directory should be skipped.
-func (r *Ranger) SkipDir() {
-	r.skipDir = true
+func (tr *Ranger) SkipDir() {
+	tr.skipDir = true
 }
 
 // ErrorPolicy sets the ErrorPolicy associated with the Walker.
-func (w *Ranger) ErrorPolicy(erp ErrorPolicy) {
-	w.erp = erp
+func (tr *Ranger) ErrorPolicy(erp ErrorPolicy) {
+	tr.erp = erp
 }
 
 // Include tells the Walker to include matching files when iterating.
-func (w *Ranger) Include(f FilterFunc) {
-	w.includeFiles = f
+func (tr *Ranger) Include(f FilterFunc) {
+	tr.includeFiles = f
 }
 
 // Exclude tells the Walker to exclude matching files when iterating.
 // Files matched by Exclude take precedence over files matched by Include.
-func (w *Ranger) Exclude(f FilterFunc) {
-	w.excludeFiles = f
+func (tr *Ranger) Exclude(f FilterFunc) {
+	tr.excludeFiles = f
 }
 
 // IncludeDir tells the Walker to recursing into matching directories.
-func (w *Ranger) IncludeDir(f FilterFunc) {
-	w.includeDirs = f
+func (tr *Ranger) IncludeDir(f FilterFunc) {
+	tr.includeDirs = f
 }
 
 // ExcludeDir tells the Walker not to recursing into matching directories.
 // Directories matched by ExcludeDir take precedence over directories matched by IncludeDir.
-func (w *Ranger) ExcludeDir(f FilterFunc) {
-	w.excludeDirs = f
+func (tr *Ranger) ExcludeDir(f FilterFunc) {
+	tr.excludeDirs = f
 }
 
 // Paths returns an iterator of file paths.
-func (w *Ranger) Paths(erp ErrorPolicy) iter.Seq[string] {
+func (tr *Ranger) Paths(erp ErrorPolicy) iter.Seq[string] {
 	return func(yield func(string) bool) {
-		for e := range w.Walk() {
+		for e := range tr.Walk() {
 			if !yield(e.Path) {
 				return
 			}
@@ -159,9 +155,9 @@ func (w *Ranger) Paths(erp ErrorPolicy) iter.Seq[string] {
 }
 
 // Entries returns a sequence of paths and directory entries in root.
-func (w *Ranger) Entries() iter.Seq2[string, fs.DirEntry] {
+func (tr *Ranger) Entries() iter.Seq2[string, fs.DirEntry] {
 	return func(yield func(string, fs.DirEntry) bool) {
-		for e := range w.Walk() {
+		for e := range tr.Walk() {
 			if !yield(e.Path, e.DirEntry) {
 				return
 			}
@@ -171,9 +167,9 @@ func (w *Ranger) Entries() iter.Seq2[string, fs.DirEntry] {
 
 // Files returns a sequence of paths and directory entries
 // for files in root, ignoring directories.
-func (w *Ranger) Files() iter.Seq2[string, fs.DirEntry] {
+func (tr *Ranger) Files() iter.Seq2[string, fs.DirEntry] {
 	return func(yield func(string, fs.DirEntry) bool) {
-		for path, de := range w.Entries() {
+		for path, de := range tr.Entries() {
 			if !de.IsDir() && !yield(path, de) {
 				return
 			}
@@ -183,9 +179,9 @@ func (w *Ranger) Files() iter.Seq2[string, fs.DirEntry] {
 
 // FilePaths returns a sequence of file paths,
 // ignoring directories.
-func (w *Ranger) FilePaths() iter.Seq[string] {
+func (tr *Ranger) FilePaths() iter.Seq[string] {
 	return func(yield func(string) bool) {
-		for path := range w.Files() {
+		for path := range tr.Files() {
 			if !yield(path) {
 				return
 			}
@@ -193,11 +189,10 @@ func (w *Ranger) FilePaths() iter.Seq[string] {
 	}
 }
 
-// DirEntries returns an iterator of fs.DirEntry
-// while following the ErrorPolicy.
-func (w *Ranger) DirEntries() iter.Seq[fs.DirEntry] {
+// DirEntries returns a sequence of fs.DirEntry.
+func (tr *Ranger) DirEntries() iter.Seq[fs.DirEntry] {
 	return func(yield func(fs.DirEntry) bool) {
-		for e := range w.Walk() {
+		for e := range tr.Walk() {
 			if !yield(e.DirEntry) {
 				return
 			}
