@@ -26,6 +26,9 @@ func TestRanger(t *testing.T) {
 		"file2.log":            &fstest.MapFile{},
 	}
 
+	temp := t.TempDir()
+	be.NilErr(t, os.CopyFS(temp, testFS))
+
 	tests := []struct {
 		name  string
 		setup func(*walker.Ranger)
@@ -101,6 +104,16 @@ func TestRanger(t *testing.T) {
 			tt.setup(&tr)
 
 			paths := slices.Collect(tr.FilePaths())
+			be.Equal(t, tt.want, strings.Join(paths, "; "))
+
+			tr = walker.New(nil, temp, walker.OnErrorHalt)
+			tt.setup(&tr)
+
+			paths = nil
+			prefix := temp + string(filepath.Separator)
+			for path := range tr.FilePaths() {
+				paths = append(paths, strings.TrimPrefix(path, prefix))
+			}
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
 		})
 	}
