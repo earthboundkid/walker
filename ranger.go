@@ -11,7 +11,7 @@ import (
 type Ranger struct {
 	fsys                       fs.FS
 	root                       string
-	walking                    bool
+	isWalking                  bool
 	skipDir                    bool
 	lastErr                    error
 	includeFiles, excludeFiles FilterFunc
@@ -25,9 +25,9 @@ func includeAll(Entry) bool { return true }
 // excludeNone is a default FilterFunc that includes all files and directories.
 func excludeNone(Entry) bool { return false }
 
-// New creates a new *Walker instance with the given root directory.
-// Pass a nil fs.FS to use filepath.WalkFunc and walk the OS filesystem.
-// The default Walker includes all files and directories.
+// New creates a new *Ranger with the given root directory.
+// Pass a nil fsys to use filepath.WalkFunc and walk the OS filesystem instead of an fs.FS.
+// The default Ranger includes all files and directories.
 // There is no default ErrorPolicy.
 func New(fsys fs.FS, root string, erp ErrorPolicy) Ranger {
 	return Ranger{
@@ -71,7 +71,7 @@ func (tr *Ranger) Walk() iter.Seq[Entry] {
 
 // walk is lower level and doesn't know about the error policy or filters
 func (tr *Ranger) walk(yield func(Entry) bool) {
-	if tr.walking {
+	if tr.isWalking {
 		panic("already walking")
 	}
 	if tr.erp == nil {
@@ -79,7 +79,7 @@ func (tr *Ranger) walk(yield func(Entry) bool) {
 	}
 	var e Entry
 	e.useFilepath = tr.fsys == nil
-	tr.walking = true
+	tr.isWalking = true
 	walkDir := func(path string, d fs.DirEntry, err error) error {
 		e.Path, e.DirEntry, tr.lastErr = path, d, err
 		if !yield(e) {
@@ -98,7 +98,7 @@ func (tr *Ranger) walk(yield func(Entry) bool) {
 	} else {
 		_ = filepath.WalkDir(tr.root, walkDir)
 	}
-	tr.walking = false
+	tr.isWalking = false
 }
 
 // Err returns the last error encountered during walking, if any.
@@ -111,33 +111,34 @@ func (tr *Ranger) HasError() bool {
 	return tr.Err() != nil
 }
 
-// SkipDir signals to a Ranger that the current directory should be skipped.
+// SkipDir signals to a Ranger during iteration that the current directory should be skipped.
+// It is an error to call SkipDir when not iterating.
 func (tr *Ranger) SkipDir() {
+	if !tr.isWalking {
+		panic("SkipDir called when not iterating")
+	}
 	tr.skipDir = true
 }
 
-// ErrorPolicy sets the ErrorPolicy associated with the Walker.
-func (tr *Ranger) ErrorPolicy(erp ErrorPolicy) {
-	tr.erp = erp
-}
-
-// Include tells the Walker to include matching files when iterating.
+// Include tells the Ranger to include matching files when iterating.
+// The default is to include all files.
 func (tr *Ranger) Include(f FilterFunc) {
 	tr.includeFiles = f
 }
 
-// Exclude tells the Walker to exclude matching files when iterating.
+// Exclude tells the Ranger to exclude matching files when iterating.
 // Files matched by Exclude take precedence over files matched by Include.
 func (tr *Ranger) Exclude(f FilterFunc) {
 	tr.excludeFiles = f
 }
 
-// IncludeDir tells the Walker to recursing into matching directories.
+// IncludeDir tells the Ranger to recursing into matching directories.
+// The default is to include all directories.
 func (tr *Ranger) IncludeDir(f FilterFunc) {
 	tr.includeDirs = f
 }
 
-// ExcludeDir tells the Walker not to recursing into matching directories.
+// ExcludeDir tells the Ranger not to recursing into matching directories.
 // Directories matched by ExcludeDir take precedence over directories matched by IncludeDir.
 func (tr *Ranger) ExcludeDir(f FilterFunc) {
 	tr.excludeDirs = f
