@@ -52,10 +52,12 @@ func (tr *Ranger) Walk() iter.Seq[Entry] {
 				}
 				continue
 			}
-			if tr.excludeDirs(e) || !tr.includeDirs(e) {
-				if e.IsDir() {
-					tr.SkipDir()
-				}
+
+			switch {
+			case e.Dir() == tr.root && (tr.excludeDirs(e) || !tr.includeDirs(e)):
+				continue
+			case e.IsDir() && (tr.excludeDirs(e) || !tr.includeDirs(e)):
+				tr.SkipDir()
 				continue
 			}
 
@@ -87,9 +89,7 @@ func (tr *Ranger) walk(yield func(Entry) bool) {
 		}
 		if tr.skipDir {
 			tr.skipDir = false
-			if e.Path != tr.root {
-				return fs.SkipDir
-			}
+			return fs.SkipDir
 		}
 		return nil
 	}

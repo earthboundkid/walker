@@ -96,6 +96,21 @@ func TestRanger(t *testing.T) {
 			},
 			want: "a.txt; dir1/file3.txt; dir1/file4.log; dir2/file5.txt; dir2/subdir/file6.go; file1.txt; file2.log",
 		},
+		{
+			name: "Files in dir*",
+			setup: func(w *walker.Ranger) {
+				w.IncludeDir(walker.MatchGlobName("dir*"))
+			},
+			want: "dir1/file3.txt; dir1/file4.log; dir2/file5.txt",
+		},
+		{
+			name: "Log files in dir*",
+			setup: func(w *walker.Ranger) {
+				w.Include(walker.MatchExtension(".log"))
+				w.IncludeDir(walker.MatchGlobName("dir*"))
+			},
+			want: "dir1/file4.log",
+		},
 	}
 
 	for _, tt := range tests {
