@@ -135,35 +135,68 @@ func TestRanger(t *testing.T) {
 }
 
 func ExampleRanger() {
-	{
-		tr := walker.New(nil, "testdata", walker.OnErrorHalt)
-		tr.Exclude(walker.MatchDotFile)
-		tr.ExcludeDir(walker.MatchDotFile)
-		paths := slices.Collect(tr.FilePaths())
-		if tr.HasError() {
-			panic(tr.Err())
-		}
-		fmt.Println("All files:")
-		fmt.Println(strings.Join(paths, "; "))
+	// Demo filesystem
+	fsys := fstest.MapFS{
+		".a-stuff/file-1.jpeg": &fstest.MapFile{},
+		"b-file-2.txt":         &fstest.MapFile{},
+		"c/file-3.png":         &fstest.MapFile{},
+		"d/file-4.jpeg":        &fstest.MapFile{},
+		"e-file-5.txt":         &fstest.MapFile{},
 	}
-	{
-		tr := walker.New(nil, "testdata", walker.OnErrorHalt)
-		tr.Exclude(walker.MatchDotFile)
-		tr.ExcludeDir(walker.MatchDotFile)
-		tr.Include(walker.MatchExtension(".txt"))
-		tr.IncludeDir(walker.MatchRegexpMust(`2`))
-		paths := slices.Collect(tr.FilePaths())
-		if tr.HasError() {
-			panic(tr.Err())
-		}
-		fmt.Println("Files ending with .txt in a directory with 2:")
-		fmt.Println(strings.Join(paths, "; "))
+
+	// Make a new Ranger that halts on error
+	tr := walker.New(fsys, ".", walker.OnErrorHalt)
+
+	fmt.Println("Files:")
+	for path := range tr.FilePaths() {
+		fmt.Println("-", path)
+	}
+	// Do a final error check
+	if tr.HasError() {
+		panic(tr.Err())
 	}
 	// Output:
-	// All files:
-	// testdata/example1/a.txt; testdata/example2/b.txt; testdata/example2/subdir/c.log; testdata/example2/subdir/d.txt
-	// Files ending with .txt in a directory with 2:
-	// testdata/example2/b.txt; testdata/example2/subdir/d.txt
+	// Files:
+	// - .a-stuff/file-1.jpeg
+	// - b-file-2.txt
+	// - c/file-3.png
+	// - d/file-4.jpeg
+	// - e-file-5.txt
+}
+
+func ExampleRanger_matching() {
+	// Demo filesystem
+	fsys := fstest.MapFS{
+		".a-stuff/file-1.jpeg": &fstest.MapFile{},
+		"b-file-2.txt":         &fstest.MapFile{},
+		"c/file-3.png":         &fstest.MapFile{},
+		"d/file-4.jpeg":        &fstest.MapFile{},
+		"e-file-5.txt":         &fstest.MapFile{},
+	}
+
+	// Make a new Ranger that ignores permission errors and halts for other problems
+	tr := walker.New(fsys, ".", walker.OnErrPermissionIgnore)
+	// Ignore dot files and dot directories
+	tr.Exclude(walker.MatchDotFile)
+	tr.ExcludeDir(walker.MatchDotFile)
+	// Only list PNG and JPEG files
+	tr.Include(walker.Or(
+		walker.MatchExtension(".png"),
+		walker.MatchExtension(".jpeg"),
+	))
+
+	fmt.Println("Files:")
+	for path := range tr.FilePaths() {
+		fmt.Println("-", path)
+	}
+	// Do a final error check
+	if tr.HasError() {
+		panic(tr.Err())
+	}
+	// Output:
+	// Files:
+	// - c/file-3.png
+	// - d/file-4.jpeg
 }
 
 func TestCollectErrors(t *testing.T) {
