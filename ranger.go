@@ -41,9 +41,8 @@ func New(fsys fs.FS, root string, erp ErrorPolicy) Ranger {
 	}
 }
 
-// Walk returns an iterator that walks the filepath
-// while filtering files and directories and following the ErrorPolicy.
-func (tr *Ranger) Walk() iter.Seq[Entry] {
+// Entries returns a sequence of Entries for matching files and directories.
+func (tr *Ranger) Entries() iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
 		for e := range tr.walk {
 			if tr.HasError() {
@@ -144,21 +143,11 @@ func (tr *Ranger) ExcludeDir(f FilterFunc) {
 	tr.excludeDirs = f
 }
 
-// Paths returns an iterator of file paths.
-func (tr *Ranger) Paths(erp ErrorPolicy) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for e := range tr.Walk() {
-			if !yield(e.Path) {
-				return
-			}
-		}
-	}
-}
-
-// Entries returns a sequence of paths and directory entries in root.
-func (tr *Ranger) Entries() iter.Seq2[string, fs.DirEntry] {
+// FilesAndDirs returns a sequence of paths and fs.DirEntries
+// for matching files and directories.
+func (tr *Ranger) FilesAndDirs() iter.Seq2[string, fs.DirEntry] {
 	return func(yield func(string, fs.DirEntry) bool) {
-		for e := range tr.Walk() {
+		for e := range tr.Entries() {
 			if !yield(e.Path, e.DirEntry) {
 				return
 			}
@@ -166,11 +155,22 @@ func (tr *Ranger) Entries() iter.Seq2[string, fs.DirEntry] {
 	}
 }
 
-// Files returns a sequence of paths and directory entries
+// FileEntries returns a sequence of Entries for matching files, ignoring directories.
+func (tr *Ranger) FileEntries() iter.Seq[Entry] {
+	return func(yield func(Entry) bool) {
+		for entry := range tr.Entries() {
+			if !entry.IsDir() && !yield(entry) {
+				return
+			}
+		}
+	}
+}
+
+// Files returns a sequence of paths and fs.DirEntries
 // for files in root, ignoring directories.
 func (tr *Ranger) Files() iter.Seq2[string, fs.DirEntry] {
 	return func(yield func(string, fs.DirEntry) bool) {
-		for path, de := range tr.Entries() {
+		for path, de := range tr.FilesAndDirs() {
 			if !de.IsDir() && !yield(path, de) {
 				return
 			}
@@ -184,17 +184,6 @@ func (tr *Ranger) FilePaths() iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for path := range tr.Files() {
 			if !yield(path) {
-				return
-			}
-		}
-	}
-}
-
-// DirEntries returns a sequence of fs.DirEntry.
-func (tr *Ranger) DirEntries() iter.Seq[fs.DirEntry] {
-	return func(yield func(fs.DirEntry) bool) {
-		for e := range tr.Walk() {
-			if !yield(e.DirEntry) {
 				return
 			}
 		}

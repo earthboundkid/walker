@@ -130,7 +130,48 @@ func TestRanger(t *testing.T) {
 				paths = append(paths, strings.TrimPrefix(path, prefix))
 			}
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
+
+			paths = nil
+			for entry := range tr.FileEntries() {
+				paths = append(paths, strings.TrimPrefix(entry.Path, prefix))
+			}
+			be.Equal(t, tt.want, strings.Join(paths, "; "))
+
+			paths = nil
+			for path, _ := range tr.Files() {
+				paths = append(paths, strings.TrimPrefix(path, prefix))
+			}
+			be.Equal(t, tt.want, strings.Join(paths, "; "))
 		})
+	}
+}
+
+func TestRanger_iter_break(t *testing.T) {
+	testFS := fstest.MapFS{
+		"a.txt":                &fstest.MapFile{},
+		"dir1/file3.txt":       &fstest.MapFile{},
+		"dir1/file4.log":       &fstest.MapFile{},
+		"dir2/file5.txt":       &fstest.MapFile{},
+		"dir2/subdir/file6.go": &fstest.MapFile{},
+		"file1.txt":            &fstest.MapFile{},
+		"file2.log":            &fstest.MapFile{},
+	}
+
+	tr := walker.New(testFS, ".", walker.OnErrorHalt)
+	for range tr.Entries() {
+		break
+	}
+	for range tr.FilesAndDirs() {
+		break
+	}
+	for range tr.FileEntries() {
+		break
+	}
+	for range tr.Files() {
+		break
+	}
+	for range tr.FilePaths() {
+		break
 	}
 }
 
@@ -199,7 +240,7 @@ func ExampleRanger_matching() {
 	// - d/file-4.jpeg
 }
 
-func TestCollectErrors(t *testing.T) {
+func tempDirWithPermErr(t *testing.T) string {
 	dir := t.TempDir()
 	testFS := fstest.MapFS{
 		"1/a.txt": &fstest.MapFile{},
@@ -211,6 +252,35 @@ func TestCollectErrors(t *testing.T) {
 	t.Cleanup(func() {
 		be.NilErr(t, os.Chmod(subdir, 0o777))
 	})
+	return dir
+}
+
+func TestOnErrorHalt(t *testing.T) {
+	dir := tempDirWithPermErr(t)
+
+	w := walker.New(nil, dir, walker.OnErrorHalt)
+	var paths []string
+	for path := range w.FilePaths() {
+		paths = append(paths, filepath.Base(path))
+	}
+	be.Equal(t, "", strings.Join(paths, "; "))
+	be.True(t, errors.Is(w.Err(), fs.ErrPermission))
+}
+
+func TestOnErrPermissionIgnore(t *testing.T) {
+	dir := tempDirWithPermErr(t)
+
+	w := walker.New(nil, dir, walker.OnErrPermissionIgnore)
+	var paths []string
+	for path := range w.FilePaths() {
+		paths = append(paths, filepath.Base(path))
+	}
+	be.Equal(t, "2.txt", strings.Join(paths, "; "))
+	be.NilErr(t, w.Err())
+}
+
+func TestCollectErrors(t *testing.T) {
+	dir := tempDirWithPermErr(t)
 
 	var errs []error
 	w := walker.New(nil, dir, walker.OnErrorCollect(&errs))
