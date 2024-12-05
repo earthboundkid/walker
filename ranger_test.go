@@ -241,11 +241,12 @@ func ExampleRanger_matching() {
 func tempDirWithPermErr(t *testing.T) string {
 	dir := t.TempDir()
 	testFS := fstest.MapFS{
-		"1/a.txt": &fstest.MapFile{},
-		"2.txt":   &fstest.MapFile{},
+		"1.txt":   &fstest.MapFile{},
+		"2/a.txt": &fstest.MapFile{},
+		"3.txt":   &fstest.MapFile{},
 	}
 	be.NilErr(t, os.CopyFS(dir, testFS))
-	subdir := filepath.Join(dir, "1")
+	subdir := filepath.Join(dir, "2")
 	be.NilErr(t, os.Chmod(subdir, 0o000))
 	t.Cleanup(func() {
 		be.NilErr(t, os.Chmod(subdir, 0o777))
@@ -261,7 +262,7 @@ func TestOnErrorHalt(t *testing.T) {
 	for path := range w.FilePaths() {
 		paths = append(paths, filepath.Base(path))
 	}
-	be.Equal(t, "", strings.Join(paths, "; "))
+	be.Equal(t, "1.txt", strings.Join(paths, "; "))
 	be.True(t, errors.Is(w.Err(), fs.ErrPermission))
 }
 
@@ -273,7 +274,7 @@ func TestOnErrPermissionIgnore(t *testing.T) {
 	for path := range w.FilePaths() {
 		paths = append(paths, filepath.Base(path))
 	}
-	be.Equal(t, "2.txt", strings.Join(paths, "; "))
+	be.Equal(t, "1.txt; 3.txt", strings.Join(paths, "; "))
 	be.NilErr(t, w.Err())
 }
 
@@ -286,7 +287,7 @@ func TestCollectErrors(t *testing.T) {
 	for path := range w.FilePaths() {
 		paths = append(paths, filepath.Base(path))
 	}
-	be.Equal(t, "2.txt", strings.Join(paths, "; "))
+	be.Equal(t, "1.txt; 3.txt", strings.Join(paths, "; "))
 	be.Equal(t, 1, len(errs))
 	be.True(t, errors.Is(errs[0], fs.ErrPermission))
 }
