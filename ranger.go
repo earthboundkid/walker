@@ -143,18 +143,6 @@ func (tr *Ranger) ExcludeDir(f FilterFunc) {
 	tr.excludeDirs = f
 }
 
-// FilesAndDirs returns a sequence of paths and fs.DirEntries
-// for matching files and directories.
-func (tr *Ranger) FilesAndDirs() iter.Seq2[string, fs.DirEntry] {
-	return func(yield func(string, fs.DirEntry) bool) {
-		for e := range tr.Entries() {
-			if !yield(e.Path, e.DirEntry) {
-				return
-			}
-		}
-	}
-}
-
 // FileEntries returns a sequence of Entries for matching files, ignoring directories.
 func (tr *Ranger) FileEntries() iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
@@ -166,24 +154,12 @@ func (tr *Ranger) FileEntries() iter.Seq[Entry] {
 	}
 }
 
-// Files returns a sequence of paths and fs.DirEntries
-// for files in root, ignoring directories.
-func (tr *Ranger) Files() iter.Seq2[string, fs.DirEntry] {
-	return func(yield func(string, fs.DirEntry) bool) {
-		for path, de := range tr.FilesAndDirs() {
-			if !de.IsDir() && !yield(path, de) {
-				return
-			}
-		}
-	}
-}
-
 // FilePaths returns a sequence of file paths,
 // ignoring directories.
 func (tr *Ranger) FilePaths() iter.Seq[string] {
 	return func(yield func(string) bool) {
-		for path := range tr.Files() {
-			if !yield(path) {
+		for e := range tr.FileEntries() {
+			if !yield(e.Path) {
 				return
 			}
 		}
