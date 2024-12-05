@@ -278,6 +278,41 @@ func TestOnErrPermissionIgnore(t *testing.T) {
 	be.NilErr(t, w.Err())
 }
 
+func TestOnErrorIgnore(t *testing.T) {
+	dir := tempDirWithPermErr(t)
+
+	w := walker.New(nil, dir, walker.OnErrorIgnore)
+	var paths []string
+	for path := range w.FilePaths() {
+		paths = append(paths, filepath.Base(path))
+	}
+	be.Equal(t, "1.txt; 3.txt", strings.Join(paths, "; "))
+	be.NilErr(t, w.Err())
+}
+
+func try(cb func()) (r any) {
+	defer func() {
+		r = recover()
+	}()
+	cb()
+	return
+}
+
+func TestOnErrorPanic(t *testing.T) {
+	dir := tempDirWithPermErr(t)
+
+	w := walker.New(nil, dir, walker.OnErrorPanic)
+	var paths []string
+	p := try(func() {
+		for path := range w.FilePaths() {
+			paths = append(paths, filepath.Base(path))
+		}
+	})
+
+	be.Equal(t, "1.txt", strings.Join(paths, "; "))
+	be.True(t, errors.Is(p.(error), fs.ErrPermission))
+}
+
 func TestCollectErrors(t *testing.T) {
 	dir := tempDirWithPermErr(t)
 
