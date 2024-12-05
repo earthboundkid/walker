@@ -23,7 +23,7 @@ func (e Entry) IsDir() bool {
 	return e.DirEntry.IsDir()
 }
 
-// Name returns DirEntry.Name() is a directory.
+// Name returns DirEntry.Name().
 // If DirEntry is nil, it returns "".
 func (e Entry) Name() string {
 	if e.DirEntry == nil {
