@@ -115,19 +115,23 @@ func TestRanger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Walk an fs.FS
 			tr := walker.New(testFS, ".", walker.OnErrorHalt)
 			tt.setup(&tr)
 
 			paths := slices.Collect(tr.FilePaths())
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
 
+			// Walk the OS filesystem
 			tr = walker.New(nil, temp, walker.OnErrorHalt)
 			tt.setup(&tr)
+			prefix := temp + string(filepath.Separator)
 
 			paths = nil
-			prefix := temp + string(filepath.Separator)
-			for path := range tr.FilePaths() {
-				paths = append(paths, strings.TrimPrefix(path, prefix))
+			for entry := range tr.Entries() {
+				if !entry.IsDir() {
+					paths = append(paths, strings.TrimPrefix(entry.Path, prefix))
+				}
 			}
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
 
@@ -138,7 +142,7 @@ func TestRanger(t *testing.T) {
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
 
 			paths = nil
-			for path, _ := range tr.Files() {
+			for path := range tr.FilePaths() {
 				paths = append(paths, strings.TrimPrefix(path, prefix))
 			}
 			be.Equal(t, tt.want, strings.Join(paths, "; "))
@@ -161,13 +165,7 @@ func TestRanger_iter_break(t *testing.T) {
 	for range tr.Entries() {
 		break
 	}
-	for range tr.FilesAndDirs() {
-		break
-	}
 	for range tr.FileEntries() {
-		break
-	}
-	for range tr.Files() {
 		break
 	}
 	for range tr.FilePaths() {
