@@ -51,13 +51,9 @@ func MatchGlobName(patterns ...string) FilterFunc {
 // It returns true if the file has any of the specified extensions.
 // It is case insensitive.
 func MatchExtension(extensions ...string) FilterFunc {
-	for i := range extensions {
-		extensions[i] = strings.ToLower(extensions[i])
-	}
 	return func(e Entry) bool {
-		ext := strings.ToLower(e.Ext())
-		for _, e := range extensions {
-			if e == ext {
+		for _, ext := range extensions {
+			if strings.EqualFold(e.Ext(), ext) {
 				return true
 			}
 		}
