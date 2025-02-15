@@ -1,4 +1,3 @@
-// Package Walker: File Ranger contains convenient iterators for using an fs.WalkFunc.
 package walker
 
 import (
