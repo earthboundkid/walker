@@ -1,7 +1,6 @@
 package walker_test
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -162,15 +161,37 @@ func TestRanger_iter_break(t *testing.T) {
 	}
 
 	tr := walker.New(testFS, ".", walker.OnErrorHalt)
-	for range tr.Entries() {
-		break
+	be.AtLeastLength(t, 1, tr.Entries())
+	be.AtLeastLength(t, 1, tr.FileEntries())
+	be.AtLeastLength(t, 1, tr.FilePaths())
+}
+
+func TestRanger_panics(t *testing.T) {
+	testFS := fstest.MapFS{
+		"a.txt":                &fstest.MapFile{},
+		"dir1/file3.txt":       &fstest.MapFile{},
+		"dir1/file4.log":       &fstest.MapFile{},
+		"dir2/file5.txt":       &fstest.MapFile{},
+		"dir2/subdir/file6.go": &fstest.MapFile{},
+		"file1.txt":            &fstest.MapFile{},
+		"file2.log":            &fstest.MapFile{},
 	}
-	for range tr.FileEntries() {
-		break
-	}
-	for range tr.FilePaths() {
-		break
-	}
+
+	be.Nonzero(t, be.Panicked(func() {
+		tr := walker.New(testFS, ".", nil)
+		for range tr.FileEntries() {
+		}
+	}))
+	tr := walker.New(testFS, ".", walker.OnErrorHalt)
+	be.Nonzero(t, be.Panicked(func() {
+		tr.SkipDir()
+	}))
+	be.Nonzero(t, be.Panicked(func() {
+		for range tr.FilePaths() {
+			for range tr.FilePaths() {
+			}
+		}
+	}))
 }
 
 func ExampleRanger() {
@@ -263,7 +284,7 @@ func TestOnErrorHalt(t *testing.T) {
 		paths = append(paths, filepath.Base(path))
 	}
 	be.Equal(t, "1.txt", strings.Join(paths, "; "))
-	be.True(t, errors.Is(w.Err(), fs.ErrPermission))
+	be.ErrorIs(t, fs.ErrPermission, w.Err())
 }
 
 func TestOnErrPermissionIgnore(t *testing.T) {
@@ -290,27 +311,19 @@ func TestOnErrorIgnore(t *testing.T) {
 	be.NilErr(t, w.Err())
 }
 
-func try(cb func()) (r any) {
-	defer func() {
-		r = recover()
-	}()
-	cb()
-	return
-}
-
 func TestOnErrorPanic(t *testing.T) {
 	dir := tempDirWithPermErr(t)
 
 	w := walker.New(nil, dir, walker.OnErrorPanic)
 	var paths []string
-	p := try(func() {
+	p := be.Panicked(func() {
 		for path := range w.FilePaths() {
 			paths = append(paths, filepath.Base(path))
 		}
 	})
 
 	be.Equal(t, "1.txt", strings.Join(paths, "; "))
-	be.True(t, errors.Is(p.(error), fs.ErrPermission))
+	be.ErrorIs(t, fs.ErrPermission, p.(error))
 }
 
 func TestCollectErrors(t *testing.T) {
@@ -323,6 +336,6 @@ func TestCollectErrors(t *testing.T) {
 		paths = append(paths, filepath.Base(path))
 	}
 	be.Equal(t, "1.txt; 3.txt", strings.Join(paths, "; "))
-	be.Equal(t, 1, len(errs))
-	be.True(t, errors.Is(errs[0], fs.ErrPermission))
+	be.EqualLength(t, 1, errs)
+	be.ErrorIs(t, fs.ErrPermission, errs[0])
 }
